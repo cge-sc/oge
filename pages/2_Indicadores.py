@@ -6,6 +6,8 @@ from datetime import date
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
+with open( "style.css" ) as css:
+    st.markdown( f'<style>{css.read()}</style>' , unsafe_allow_html= True)
 
 hoje = str(date.today())
 ano = date.year
@@ -14,6 +16,19 @@ st.set_page_config(
     page_title="Indicadores de Ouvidoria",
     layout="wide"
 )
+
+
+# CARREGA OS DADOS
+@st.cache_data
+def carrega_dados(arquivo):
+    data = pd.read_json(arquivo)
+#    data = pd.read_csv('ouvidoria-2019.csv', sep=';')
+    return data
+
+atendimentos = carrega_dados('https://dados.sc.gov.br/dataset/3c9311c4-ad13-4730-bb6b-bb0f5fda2910/resource/5735a52c-a578-4529-ac0a-c8ca15da82ca/download/tb_atendimento.json')
+encaminhamentos = carrega_dados('https://dados.sc.gov.br/dataset/3c9311c4-ad13-4730-bb6b-bb0f5fda2910/resource/94575080-6d10-40e5-a160-938afaa73d2f/download/tb_encaminhamento.json')
+cartas = carrega_dados('https://dados.sc.gov.br/dataset/3c9311c4-ad13-4730-bb6b-bb0f5fda2910/resource/ea2d7235-b1b3-4d79-aacc-7f70bf4b4817/download/tb_carta.json')
+
 
 def convert_df(df):
     # IMPORTANT: Cache the conversion to prevent computation on every rerun
@@ -27,16 +42,13 @@ def verifica_transferido(row):
     else:
         return 'Normal'
 
-# CARREGA OS DADOS
-@st.cache_data
-def carrega_dados(arquivo):
-    data = pd.read_json(arquivo)
-#    data = pd.read_csv('ouvidoria-2019.csv', sep=';')
-    return data
+def buscar_encaminhamentos(df):
+    return 
 
-atendimentos = carrega_dados('https://dados.sc.gov.br/dataset/3c9311c4-ad13-4730-bb6b-bb0f5fda2910/resource/5735a52c-a578-4529-ac0a-c8ca15da82ca/download/tb_atendimento.json')
-encaminhamentos = carrega_dados('https://dados.sc.gov.br/dataset/3c9311c4-ad13-4730-bb6b-bb0f5fda2910/resource/94575080-6d10-40e5-a160-938afaa73d2f/download/tb_encaminhamento.json')
 
+def buscar_cartas(encaminhamento):
+    cartas_encaminhamento = cartas.query('id_encaminhamento == @encaminhamento and de_tipo == "C"')
+    return cartas_encaminhamento
 
 # TITULO DO APP
 st.title("Indicadores de Ouvidoria")
@@ -72,13 +84,22 @@ atendimentos = atendimentos.query('dt_criacao >= @start_date and dt_criacao <= @
 atendimentos['dt_criacao'] = pd.to_datetime(atendimentos['dt_criacao']).dt.date
 atendimentos['transferido'] = atendimentos.apply(verifica_transferido, axis=1)
 
+lista_encaminhamentos = encaminhamentos['id_encaminhamento']
+#encaminhamentos['cartas'] = encaminhamentos.apply(lambda x: buscar_cartas(encaminhamentos['id_encaminhamento']))
+#st.dataframe(encaminhamentos)
+
+
+df = atendimentos.join(encaminhamentos.set_index('id_atendimento'), on='id_atendimento', lsuffix='_encam.')
+df = df.join(cartas.set_index('id_encaminhamento'), on='id_encaminhamento', lsuffix='_cartas')
+df_apenas_c = df.loc[df.de_tipo=='C']
+st.dataframe(df_apenas_c)
 
 atendimentos_por_natureza = (atendimentos.groupby(['de_natureza','dt_criacao']).size()).reset_index(name='quantidade')
-fig = px.area(atendimentos_por_natureza, x="dt_criacao", color="de_natureza",y="quantidade", title="Demandas por dia", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+fig = px.area(atendimentos_por_natureza, x="dt_criacao", color="de_natureza",y="quantidade", title="Demandas por dia", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
 fig.update_layout(title_x=0.15, xaxis_rangeslider_visible=True, width=1300,height=500)
 st.write(fig)
 fig = px.scatter(atendimentos_por_natureza, x="dt_criacao", y="quantidade", color="de_natureza", title="Demandas por dia",
-                size="quantidade",hover_data=['de_natureza'], color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+                size="quantidade",hover_data=['de_natureza'], color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
 fig.update_layout(title_x=0.15, xaxis_rangeslider_visible=True, width=1300,height=500)
 st.write(fig)
 
@@ -88,7 +109,7 @@ with col1:
     atendimentos_por_forma.reset_index(drop=False, inplace=True)
     atendimentos_por_forma_ordenado = atendimentos_por_forma.sort_values(by=['quantidade'],ascending=False)
     atendimentos_por_forma_top_10 = atendimentos_por_forma_ordenado.head(10)
-    fig = px.pie(atendimentos_por_forma_top_10, names="de_forma", values="quantidade", title="Demandas por Canal", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+    fig = px.pie(atendimentos_por_forma_top_10, names="de_forma", values="quantidade", title="Demandas por Canal", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
     fig.update_layout(title_x=0.15, width=300,height=500)
     fig.update_layout(legend=dict(orientation="h",yanchor="bottom",y=-0.2,xanchor="right",x=1))
     st.write(fig)
@@ -96,7 +117,7 @@ with col2:
     atendimentos_transferidos = (atendimentos.groupby(['transferido']).size()).reset_index(name='quantidade')
     atendimentos_transferidos.reset_index(drop=False, inplace=True)
     atendimentos_transferidos_ordenado = atendimentos_transferidos.sort_values(by=['quantidade'],ascending=False)
-    fig = px.pie(atendimentos_transferidos_ordenado, names="transferido", values="quantidade", title="Transferências", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+    fig = px.pie(atendimentos_transferidos_ordenado, names="transferido", values="quantidade", title="Transferências", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
     fig.update_layout(title_x=0.15, width=300,height=500)
     fig.update_layout(legend=dict(orientation="h",yanchor="bottom",y=-0.2,xanchor="right",x=1))
     st.write(fig)
@@ -104,7 +125,7 @@ with col3:
     atendimentos_por_programa = (atendimentos.groupby(['de_programa']).size()).reset_index(name='quantidade')
     atendimentos_por_programa.reset_index(drop=False, inplace=True)
     atendimentos_por_programa_ordenado = atendimentos_por_programa.sort_values(by=['quantidade'],ascending=False)
-    fig = px.pie(atendimentos_por_programa_ordenado, names="de_programa", values="quantidade", title="Programas", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+    fig = px.pie(atendimentos_por_programa_ordenado, names="de_programa", values="quantidade", title="Programas", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
     fig.update_layout(title_x=0.15, width=300,height=500)
     fig.update_layout(legend=dict(orientation="h",yanchor="bottom",y=-0.2,xanchor="right",x=1))
     st.write(fig)
@@ -112,7 +133,7 @@ with col3:
 atendimentos_situacao = (atendimentos.groupby(['de_status_atendimento']).size()).reset_index(name='quantidade')
 atendimentos_situacao.reset_index(drop=False, inplace=True)
 atendimentos_situacao_ordenado = atendimentos_situacao.sort_values(by=['quantidade'],ascending=False)
-fig = px.pie(atendimentos_situacao_ordenado, names="de_status_atendimento", values="quantidade", title="Situação do Atendimento", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+fig = px.pie(atendimentos_situacao_ordenado, names="de_status_atendimento", values="quantidade", title="Situação do Atendimento", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
 fig.update_layout(title_x=0.15, xaxis_rangeslider_visible=True, width=1000,height=500)
 st.write(fig)
 
@@ -122,7 +143,7 @@ with col1:
     atendimentos_por_natureza.reset_index(drop=False, inplace=True)
     atendimentos_por_natureza_ordenado = atendimentos_por_natureza.sort_values(by=['quantidade'],ascending=False)
     atendimentos_por_natureza_top_10 = atendimentos_por_natureza_ordenado.head(10)
-    fig = px.pie(atendimentos_por_natureza_top_10, names="de_natureza", values="quantidade", title="Demandas por Natureza", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+    fig = px.pie(atendimentos_por_natureza_top_10, names="de_natureza", values="quantidade", title="Demandas por Natureza", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
     fig.update_layout(title_x=0.15, xaxis_rangeslider_visible=True, width=500,height=700)
     fig.update_layout(legend=dict(orientation="h",yanchor="bottom",y=-1,xanchor="right",x=1))
     st.write(fig)
@@ -131,7 +152,7 @@ with col2:
     atendimentos_por_assunto.reset_index(drop=False, inplace=True)
     atendimentos_por_assunto_ordenado = atendimentos_por_assunto.sort_values(by=['quantidade'],ascending=False)
     atendimentos_por_assunto_top_10 = atendimentos_por_assunto_ordenado.head(10)
-    fig = px.pie(atendimentos_por_assunto_top_10, names="de_assunto", values="quantidade", title="Demandas por Assunto", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+    fig = px.pie(atendimentos_por_assunto_top_10, names="de_assunto", values="quantidade", title="Demandas por Assunto", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
     fig.update_layout(title_x=0.15, xaxis_rangeslider_visible=True, width=500,height=700)
     fig.update_layout(legend=dict(orientation="h",yanchor="bottom",y=-1,xanchor="right",x=1))
     st.write(fig)
@@ -139,7 +160,7 @@ with col2:
 atendimentos_natureza_assunto = atendimentos[['de_natureza', 'de_assunto', 'de_status_atendimento']]
 atendimentos_natureza_assunto['quantidade'] = 1
 atendimentos_natureza_assunto.de_assunto.fillna('Não Informado', inplace=True) 
-fig = px.sunburst(atendimentos_natureza_assunto, title="Natureza e Assunto", path=['de_natureza', 'de_assunto'], values='quantidade', color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+fig = px.sunburst(atendimentos_natureza_assunto, title="Natureza e Assunto", path=['de_natureza', 'de_assunto'], values='quantidade', color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
 fig.update_layout(title_x=0.15, xaxis_rangeslider_visible=True, width=1000,height=500)
 st.write(fig)
 
@@ -154,7 +175,7 @@ st.write(fig)
 atendimentos_por_identificacao = (atendimentos.groupby(['de_tp_identificacao']).size()).reset_index(name='quantidade')
 atendimentos_por_identificacao.reset_index(drop=False, inplace=True)
 atendimentos_por_identificacao_ordenado = atendimentos_por_identificacao.sort_values(by=['quantidade'],ascending=False)
-fig = px.pie(atendimentos_por_identificacao_ordenado, names="de_tp_identificacao", values="quantidade", title="Demandas por Tipo de Identificacação", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+fig = px.pie(atendimentos_por_identificacao_ordenado, names="de_tp_identificacao", values="quantidade", title="Demandas por Tipo de Identificacação", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
 fig.update_layout(title_x=0.15, xaxis_rangeslider_visible=True, width=1000,height=500)
 st.write(fig)
 
@@ -163,7 +184,7 @@ with col1:
     atendimentos_por_pessoa = (atendimentos.groupby(['tipo_pessoa']).size()).reset_index(name='quantidade')
     atendimentos_por_pessoa.reset_index(drop=False, inplace=True)
     atendimentos_por_pessoa_ordenado = atendimentos_por_pessoa.sort_values(by=['quantidade'],ascending=False)
-    fig = px.pie(atendimentos_por_pessoa_ordenado, names="tipo_pessoa", values="quantidade", title="Demandas por Tipo de Pessoa", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+    fig = px.pie(atendimentos_por_pessoa_ordenado, names="tipo_pessoa", values="quantidade", title="Demandas por Tipo de Pessoa", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
     fig.update_layout(title_x=0.15, xaxis_rangeslider_visible=True, width=500,height=500)
     st.write(fig)
 with col2:
@@ -173,7 +194,7 @@ with col2:
     atendimentos_por_sexo_ordenado['de_sexo_solicitante'] = atendimentos_por_sexo_ordenado['de_sexo_solicitante'].replace('M', 'Maculino')
     atendimentos_por_sexo_ordenado['de_sexo_solicitante'] = atendimentos_por_sexo_ordenado['de_sexo_solicitante'].replace('F', 'Feminino')
     atendimentos_por_sexo_ordenado['de_sexo_solicitante'] = atendimentos_por_sexo_ordenado['de_sexo_solicitante'].replace('N', 'Não Informado')
-    fig = px.pie(atendimentos_por_sexo_ordenado, names="de_sexo_solicitante", values="quantidade", title="Demandas por Sexo", color_discrete_sequence=['#0d0887', '#46039f', '#7201a8', '#9c179e', '#bd3786', '#d8576b', '#ed7953', '#fb9f3a', '#fdca26', '#f0f921'])
+    fig = px.pie(atendimentos_por_sexo_ordenado, names="de_sexo_solicitante", values="quantidade", title="Demandas por Sexo", color_discrete_sequence=['#336633', '#337733','#338833', '#339933','#33AA33', '#33BB33', '#33CC33', '#33DD33', '#33EE33', '#33FF33'])
     fig.update_layout(title_x=0.15, xaxis_rangeslider_visible=True, width=500,height=500)
     st.write(fig)
 

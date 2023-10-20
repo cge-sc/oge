@@ -7,12 +7,21 @@ from datetime import date
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
 
+####################################################
+# INICIALIZAÇÃO
+hoje = str(date.today())
 
-def convert_df(df):
-    # IMPORTANT: Cache the conversion to prevent computation on every rerun
-    return df.to_csv().encode('utf-8')
+# LAYOUT
+with open( "style.css" ) as css:
+    st.markdown( f'<style>{css.read()}</style>' , unsafe_allow_html= True)
+
+cores_cge = ['#A1C222', '#38a64c','#008265', '#005c64', '#171717', '#424242', '#d5d6d7', '#e42320', '#33EE33', '#33FF33']
+verde_claro = ['#A1C222']
 
 # CARREGA OS DADOS
+def convert_df(df):
+    return df.to_csv().encode('utf-8')
+
 @st.cache_data
 def carrega_dados():
     data = pd.read_csv('https://dados.sc.gov.br/dataset/3c9311c4-ad13-4730-bb6b-bb0f5fda2910/resource/dee3f7ca-4c97-4a73-abcf-9f7330ba06b6/download/ouvidoria-2019.csv', sep=';')
@@ -21,14 +30,17 @@ def carrega_dados():
 
 atendimentos_completo = carrega_dados()
 
-hoje = str(date.today())
-atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('Sem Tramit.','Pronto Atendimento')
+# AJUSTES 
 atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('Sem Tramit.','Pronto Atendimento')
 atendimentos_completo.data_conclusao.fillna(hoje, inplace=True) 
 atendimentos_completo[['data_conclusao','data_atendimento']] = atendimentos_completo[['data_conclusao','data_atendimento']].apply(pd.to_datetime)
 atendimentos_completo['prazo_atendimento'] = (atendimentos_completo['data_conclusao'] - atendimentos_completo['data_atendimento']).dt.days
 atendimentos_completo['atrasado'] = np.where(atendimentos_completo['prazo_atendimento'] > 30 , True, False)
 atendimentos_completo['quantidade'] = 1
+
+
+############################################################
+# CABEÇALHOS E FILTROS
 
 # TITULO DO APP
 st.title("Relatório de Ouvidoria")
@@ -61,24 +73,54 @@ else:
 
 atendimentos = atendimentos_completo.query('data_atendimento >= @start_date and data_atendimento <= @end_date')
 
-tamanho = len(atendimentos)
+# FILTRO ÓRGÃO
+orgaos = pd.DataFrame(atendimentos['sigla_orgao_saida'].unique())
+orgaos = orgaos.sort_values(by=0)
+quantidade_orgaos = len(orgaos)
+todos = pd.DataFrame([['Todos']])
+orgaos = pd.concat([orgaos, todos], ignore_index=False)
+orgaos = orgaos.dropna(axis='rows')
 
 orgao = st.selectbox(
     'Selecione o órgão',
-    ('TODOS', 'SICOS', 'SEPLAN', 'SIE'), index=0)
+    orgaos, index=quantidade_orgaos-1)
 
-if orgao == 'SICOS':
-    atendimentos = atendimentos.query('sigla_orgao_primeiro_encaminhamento == "SICOS"')
-if orgao == 'SEPLAN':
-    atendimentos = atendimentos.query('sigla_orgao_primeiro_encaminhamento == "SEPLAN"')
-if orgao == 'SIE':
-    atendimentos = atendimentos.query('sigla_orgao_primeiro_encaminhamento == "SIE"')    
+if orgao != "Todos":
+    atendimentos = atendimentos.query('sigla_orgao_primeiro_encaminhamento == @orgao')
 
+# INPUT LIGAÇÕES TELEFÔNICAS
 ligacoes = st.number_input('Quantidade de ligações no período', min_value=1, value=999, step=1)
 
 
+#FILTRO OPÇÕES
+conta_transferidos = st.checkbox('Contabiliza Transferidos')
+conta_pronto = st.checkbox('Contabiliza Pronto Atedimento')
+#if conta_pronto:
+#    st.write('Great!')
 
 
+# TOTALIZADORES
+atendimentos_tratados = atendimentos[(atendimentos["transferido"]!="Transferido") & (atendimentos["status"]=="Concluido")]
+atendimentos_encaminhados = atendimentos[(atendimentos["transferido"]=="Normal") & (atendimentos["status"]!="Concluido")]
+atendimentos_transferidos = atendimentos[atendimentos["transferido"]=="Transferido"]
+atendimentos_pronto = atendimentos[atendimentos["sigla_orgao_saida"]=="Pronto Atendimento"]
+atendimentos_orgaos = atendimentos[atendimentos["sigla_orgao_saida"]!="Pronto Atendimento"]
+
+quantidade_atendimentos = len(atendimentos.index)
+quantidade_pronto_atendimento = len(atendimentos[atendimentos["sigla_orgao_saida"]=="Pronto Atendimento"])
+quantidade_transferidos = len(atendimentos[atendimentos["transferido"]=="Transferido"])
+quantidade_telefonemas = len(atendimentos[atendimentos["forma_atendimento"]=="Telefone"])
+quantidade_encaminhados = quantidade_atendimentos - quantidade_pronto_atendimento - quantidade_transferidos
+quantidade_tratados = quantidade_atendimentos - quantidade_transferidos
+quantidade_tratados_concluidos = len(atendimentos_tratados[atendimentos_tratados["status"]=="Concluido"])
+quantidade_tratados_concluidos_prazo = len(atendimentos_tratados[(atendimentos_tratados["status"]=="Concluido") & (atendimentos_tratados["atrasado"]==False)])
+quantidade_tratados_concluidos_fora_prazo = len(atendimentos_tratados[(atendimentos_tratados["status"]=="Concluido") & (atendimentos_tratados["atrasado"]==True)])
+quantidade_tratados_encaminhados = len(atendimentos_encaminhados)
+quantidade_tratados_encaminhados_prazo = len(atendimentos_encaminhados[atendimentos_encaminhados["atrasado"]==False])
+quantidade_tratados_encaminhados_fora_prazo = len(atendimentos_encaminhados[atendimentos_encaminhados["atrasado"]==True])
+
+
+###############################################################
 # 1 - ATENDIMENTO DE OUVIDORIA
 st.write(""" 
 ## 1 - ATENDIMENTO DE OUVIDORIA
@@ -88,26 +130,9 @@ Após o registro da manifestação, a Ouvidoria-Geral procede à análise prelim
 As manifestações são encaminhadas às ouvidorias setoriais ou seccionais diretamente envolvidas, as quais respondem à Ouvidoria-Geral do Estado, 
 que analisa a resposta e envia a Decisão Administrativa Final ao usuário no prazo legalmente estabelecido, que atualmente é de até 30 dias.
 """)
-quantidade_atendimentos = len(atendimentos.index)
-quantidade_pronto_atendimento = len(atendimentos[atendimentos["sigla_orgao_saida"]=="Pronto Atendimento"])
-quantidade_transferidos = len(atendimentos[atendimentos["transferido"]=="Transferido"])
-quantidade_telefonemas = len(atendimentos[atendimentos["forma_atendimento"]=="Telefone"])
-quantidade_encaminhados = quantidade_atendimentos - quantidade_pronto_atendimento - quantidade_transferidos
-quantidade_tratados = quantidade_atendimentos - quantidade_transferidos
-atendimentos_tratados = atendimentos[(atendimentos["transferido"]!="Transferido") & (atendimentos["status"]=="Concluido")]
-atendimentos_encaminhados = atendimentos[(atendimentos["transferido"]=="Normal") & (atendimentos["status"]!="Concluido")]
-atendimentos_transferidos = atendimentos[atendimentos["transferido"]=="Transferido"]
-quantidade_transferidos_2 = len(atendimentos_transferidos)
-atendimentos_pronto = atendimentos[atendimentos["sigla_orgao_saida"]=="Pronto Atendimento"]
-atendimentos_orgaos = atendimentos[atendimentos["sigla_orgao_saida"]!="Pronto Atendimento"]
-quantidade_tratados_concluidos = len(atendimentos_tratados[atendimentos_tratados["status"]=="Concluido"])
-quantidade_tratados_concluidos_prazo = len(atendimentos_tratados[(atendimentos_tratados["status"]=="Concluido") & (atendimentos_tratados["atrasado"]==False)])
-quantidade_tratados_concluidos_fora_prazo = len(atendimentos_tratados[(atendimentos_tratados["status"]=="Concluido") & (atendimentos_tratados["atrasado"]==True)])
-quantidade_tratados_encaminhados = len(atendimentos_encaminhados)
-quantidade_tratados_encaminhados_prazo = len(atendimentos_encaminhados[atendimentos_encaminhados["atrasado"]==False])
-quantidade_tratados_encaminhados_fora_prazo = len(atendimentos_encaminhados[atendimentos_encaminhados["atrasado"]==True])
 
 
+#####################################################################
 # 2 - MANIFESTAÇÕES POR ÓRGÃO OU ENTIDADE DO PODER EXECUTIVO
 st.write("""
 ## 2 - MANIFESTAÇÕES POR ÓRGÃO OU ENTIDADE DO PODER EXECUTIVO
@@ -121,13 +146,60 @@ st.write("Ressaltamos que cada órgão ou entidade da Administração Pública E
 atendimentos_tabela = atendimentos.groupby(['sigla_orgao_saida','natureza']).size().to_frame('quantidade')
 atendimentos_tabela_pivot = pd.pivot_table(atendimentos_tabela, index='sigla_orgao_saida', values='quantidade', columns='natureza', aggfunc='sum' )
 atendimentos_tabela_pivot.rename({'sigla_orgao_saida': 'Órgão'}, axis=1, inplace=True)
-st.dataframe(atendimentos_tabela_pivot)
 
-#atendimentos_trans_tabela = atendimentos_transferidos.groupby(['natureza']).size().to_frame('quantidade')
-#atendimentos_trans_tabela_pivot = pd.pivot_table(atendimentos_trans_tabela, index='natureza', values='quantidade', columns='natureza', aggfunc='sum' )
-#atendimentos_trans_tabela_pivot.rename({'sigla_orgao_saida': 'Órgão'}, axis=1, inplace=True)
-#st.dataframe(atendimentos_trans_tabela_pivot)
+if conta_transferidos:
+    transferidos = pd.DataFrame([["Transferidos", 0, 0, 0, 0, quantidade_transferidos, 0]])
+    transferidos.columns = ["sigla_orgao", "Denúncia", "Denúncia (Disque 100)", "Elogio", "Reclamação", "Solicitação", "Sugestão"]
+    transferidos = transferidos.set_index("sigla_orgao")
+    atendimentos_tabela_pivot = pd.concat([atendimentos_tabela_pivot, transferidos], ignore_index=False)
 
+if "Denúncia" in atendimentos_tabela_pivot.columns:
+    denuncias = atendimentos_tabela_pivot["Denúncia"].sum()
+else:
+    denuncias = 0
+if "Denúncia (Disque 100)" in atendimentos_tabela_pivot.columns:
+    disque100 = atendimentos_tabela_pivot["Denúncia (Disque 100)"].sum()
+else:
+    disque100 = 0
+if "Elogio" in atendimentos_tabela_pivot.columns:
+    elogios = atendimentos_tabela_pivot["Elogio"].sum()
+else:
+    elogios =0
+if "Reclamação" in atendimentos_tabela_pivot.columns:
+    reclamacoes = atendimentos_tabela_pivot["Reclamação"].sum()
+else:
+    reclamacoes = 0
+if "Solicitação" in atendimentos_tabela_pivot.columns:
+    solicitacoes = atendimentos_tabela_pivot["Solicitação"].sum()
+else:
+    solicitacoes = 0
+if "Sugestão" in atendimentos_tabela_pivot.columns:
+    sugestoes = atendimentos_tabela_pivot["Sugestão"].sum()
+else:
+    sugestoes = 0
+if "Solicitação Documentos/Informações/Lei de Acesso à Informação" in atendimentos_tabela_pivot.columns:
+    lais = atendimentos_tabela_pivot["Solicitação Documentos/Informações/Lei de Acesso à Informação"].sum()
+    totalizador = pd.DataFrame([["Total", denuncias, disque100, elogios, reclamacoes, solicitacoes, lais, sugestoes]])
+    totalizador.columns = ["sigla_orgao", "Denúncia", "Denúncia (Disque 100)", "Elogio", "Reclamação", "Solicitação", "Solicitação Documentos/Informações/Lei de Acesso à Informação", "Sugestão"]
+else:
+    totalizador = pd.DataFrame([["Total", denuncias, disque100, elogios, reclamacoes, solicitacoes, sugestoes]])
+    totalizador.columns = ["sigla_orgao", "Denúncia", "Denúncia (Disque 100)", "Elogio", "Reclamação", "Solicitação", "Sugestão"]
+totalizador = totalizador.set_index("sigla_orgao")
+
+if orgao == 'Todos':
+    atendimentos_tabela_pivot = pd.concat([atendimentos_tabela_pivot, totalizador], ignore_index=False)
+    atendimentos_tabela_pivot = atendimentos_tabela_pivot.fillna(0)
+    if "Solicitação Documentos/Informações/Lei de Acesso à Informação" in atendimentos_tabela_pivot.columns:
+        atendimentos_tabela_pivot["Total"] = atendimentos_tabela_pivot["Denúncia"] + atendimentos_tabela_pivot["Denúncia (Disque 100)"] + atendimentos_tabela_pivot["Elogio"] + atendimentos_tabela_pivot["Reclamação"] + atendimentos_tabela_pivot["Solicitação"] + atendimentos_tabela_pivot["Solicitação Documentos/Informações/Lei de Acesso à Informação"] + atendimentos_tabela_pivot["Sugestão"]
+    else:
+        atendimentos_tabela_pivot["Total"] = atendimentos_tabela_pivot["Denúncia"] + atendimentos_tabela_pivot["Denúncia (Disque 100)"] + atendimentos_tabela_pivot["Elogio"] + atendimentos_tabela_pivot["Reclamação"] + atendimentos_tabela_pivot["Solicitação"] + atendimentos_tabela_pivot["Sugestão"]
+    # TABELA 1 - Tabela 1 - Manifestações recebidas por Tipo, segundo os órgãos e entidades do Poder Executivo
+    st.write("TABELA 1 - Tabela 1 - Manifestações recebidas por Tipo, segundo os órgãos e entidades do Poder Executivo")
+    st.dataframe(atendimentos_tabela_pivot)
+    st.write("Fonte: Sistema OUV. " + hoje)
+
+
+##################################################################
 # 3 - RESULTADOS DA OUVIDORIA NO PERÍODO
 st.write(""" 
 ## 3 - RESULTADOS DA OUVIDORIA NO PERÍODO
@@ -143,10 +215,12 @@ total = go.Figure(go.Indicator(
     mode = "number",
     value = quantidade_tratados,
     number = {"valueformat":"f"},
-    title = {"text": "Atendimentos"},
+    title = {"text": "Total de Manifestações"},
+    #textfont = {'family': "Roboto", 'size': 50, 'color': "#fff"},
     domain = {'x': [0, 1], 'y': [0.25, 0.75]}))
-total.update_layout(paper_bgcolor = "lightgray")
+total.update_layout(paper_bgcolor = '#A1C222', font_family="Roboto", font=dict(family="Roboto", size=100, color="white"))
 st.plotly_chart(total)
+
 subtotal = go.Figure()
 subtotal.add_trace(go.Indicator(
     mode = "number",
@@ -210,10 +284,11 @@ subtotal.add_trace(go.Indicator(
     value = percentual_encaminhados_fora_prazo,
     number = {"valueformat":".2f", "suffix": "%"},
     domain = {'x': [0.75, 1], 'y': [0, 0.19]}))
-subtotal.update_layout(paper_bgcolor = "lightgray")
+subtotal.update_layout(paper_bgcolor = '#424242', font_family="Roboto", font=dict(family="Roboto", size=100, color="white"))
 st.plotly_chart(subtotal)
 
 
+st.write("3.1 TEMPO MÉDIO DE RESPOSTA DA OUVIDORIA-GERAL (EM DIAS)")
 atendimentos_tratados_concluidos = atendimentos_tratados[(atendimentos_tratados["status"]=="Concluido")] 
 prazo_medio = atendimentos_tratados_concluidos.loc[:, 'prazo_atendimento'].mean()
 total = go.Figure(go.Indicator(
@@ -222,7 +297,7 @@ total = go.Figure(go.Indicator(
     number = {"valueformat":".1f", "suffix":" dias"},
     title = {"text": "Tempo Médio Resposta (Geral)"},
     domain = {'x': [0, 1], 'y': [0.25, 0.75]}))
-total.update_layout(paper_bgcolor = "lightgray")
+total.update_layout(paper_bgcolor = '#A1C222', font_family="Roboto", font=dict(family="Roboto", size=100, color="white"))
 st.plotly_chart(total)
 
 prazo_medio_pronto = atendimentos_pronto.loc[:, 'prazo_atendimento'].mean()
@@ -232,7 +307,7 @@ total = go.Figure(go.Indicator(
     number = {"valueformat":".1f", "suffix":" dias"},
     title = {"text": "Tempo Médio Resposta (Pronto Atendimento)"},
     domain = {'x': [0, 1], 'y': [0.25, 0.75]}))
-total.update_layout(paper_bgcolor = "lightgray")
+total.update_layout(paper_bgcolor = '#A1C222', font_family="Roboto", font=dict(family="Roboto", size=100, color="white"))
 st.plotly_chart(total)
 
 prazo_medio_orgaos = atendimentos_orgaos.loc[:, 'prazo_atendimento'].mean()
@@ -242,15 +317,13 @@ total = go.Figure(go.Indicator(
     number = {"valueformat":".1f", "suffix":" dias"},
     title = {"text": "Tempo Médio Resposta (Órgãos)"},
     domain = {'x': [0, 1], 'y': [0.25, 0.75]}))
-total.update_layout(paper_bgcolor = "lightgray")
+total.update_layout(paper_bgcolor = '#A1C222', font_family="Roboto", font=dict(family="Roboto", size=100, color="white"))
 st.plotly_chart(total)
-
-st.dataframe(atendimentos_encaminhados)
+st.write("O tempo médio de resposta da Ouvidoria-Geral ao usuário foi de " + str(prazo_medio) + " dias, incluindo as manifestações com o tratamento de pronto atendimento e as transferidas ao E-SIC.")
+st.write("Se considerarmos apenas as manifestações que foram encaminhadas aos órgãos e entidades do poder executivo estadual para tratamento, o tempo médio de resposta passa para " + str(prazo_medio_orgaos) + " dias.")
 
 
 atendimentos_concluidos = atendimentos_tratados[atendimentos_tratados["status"]!="Concluidos"]
-#atendimentos_concluidos['tempo_resposta'] = abs(datetime.datetime.strptime(str(atendimentos_concluidos['data_conclusao']), '%Y-%m-%d') - datetime.datetime.strptime(str(atendimentos_concluidos['data_atendimento']), '%Y-%m-%d')).days 
-#st.dataframe(atendimentos_concluidos)
 
 ate_primeiro_por_natureza = atendimentos_tratados.groupby(['natureza']).size().to_frame('quantidade')
 quantidade_atendimentos_tratados = len(atendimentos_tratados)
@@ -266,6 +339,7 @@ percentual_elogios = round((quantidade_elogios * 100) / quantidade_atendimentos_
 percentual_sugestoes = round((quantidade_sugestoes * 100) / quantidade_atendimentos_tratados, 2) 
 
 
+#####################################################################################
 # 4 - RESULTADOS DO PERÍODO
 st.write(""" 
 ## 4 - RESULTADOS DO PERÍODO
@@ -273,58 +347,308 @@ st.write("""
 """)
 st.write("A maior parte das manifestações (" + str(percentual_solicitacoes) + "%) atendidas pela Ouvidoria pertence ao tipo Solicitação. O tipo Reclamação, alcança percentual bem menor (" + str(percentual_reclamacoes) + "%), Denúncias (" + str(percentual_denuncias) + "%), Elogios (" + str(percentual_elogios) + "%) e Sugestões (" + str(percentual_sugestoes) + "%).")
 
-pizza = px.pie(atendimentos_tratados, values='quantidade', names='natureza', title='Tipologia das Manifestações', color_discrete_sequence=px.colors.sequential.RdBu)
+pizza = px.pie(atendimentos_tratados, values='quantidade', names='natureza', title='Gráfico 1 - Tipologia das Manifestações', color_discrete_sequence=cores_cge)
+pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(pizza)
-
-#fig.show()
-
+st.write("Fonte: Sistema OUV. " + hoje)
 
 st.write(""" 
 ### 4.2 - ASSUNTOS MAIS DEMANDADOS
 """)
+atendimentos_solicitacoes = atendimentos_tratados[atendimentos_tratados["natureza"]=="Solicitação"]
 ate_primeiro_por_assunto = atendimentos_tratados.groupby(['assunto']).size().to_frame('quantidade')
+ate_primeiro_por_assunto.reset_index(inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Manifestação Incompleta (Falta Dados)"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Devolução Para Proteção aos Dados do Usuário"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não Foi Possível Compreender"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Atendimento em Duplicidade"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência municipal"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Lei de Acesso à Informação"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não é de Competência da OGE"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência da União/Federal"].index, inplace=True)
 ate_primeiro_por_assunto_ordenado = ate_primeiro_por_assunto.sort_values(by=['quantidade'],ascending=False)
 data_top = ate_primeiro_por_assunto_ordenado.head(10)
-data_top.reset_index(drop=False, inplace=True)
+data_top.reset_index(drop=True, inplace=True)
 
+st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023:")
+fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title=" Gráfico 2 - Assuntos mais demandados", color='quantidade', color_discrete_sequence=verde_claro)       
+fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(fig)
 #st.write(fig)
+if st.checkbox('Mostrar Todos os Assuntos'):
+    st.dataframe(ate_primeiro_por_assunto_ordenado)
 
 st.write("""
 ### 4.3 - ANÁLISE DAS MANIFESTAÇÕES – SOLICITAÇÕES
-Apresentamos o ranking dos 10 assuntos mais demandados no período.
+Apresentamos o ranking dos 10 assuntos mais demandados no período para as solictações.
 """)
-st.dataframe(data_top)  
-st.write(data_top.columns)
-fig=px.bar(data_top, x='quantidade',y='assunto', orientation='h', color='quantidade', color_discrete_sequence=px.colors.sequential.RdBu)       
-st.write(fig)
+
+atendimentos_solicitacoes = atendimentos_tratados[atendimentos_tratados["natureza"]=="Solicitação"]
+ate_primeiro_por_assunto = atendimentos_solicitacoes.groupby(['assunto']).size().to_frame('quantidade')
+ate_primeiro_por_assunto.reset_index(inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Manifestação Incompleta (Falta Dados)"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Devolução Para Proteção aos Dados do Usuário"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não Foi Possível Compreender"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Atendimento em Duplicidade"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência municipal"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Lei de Acesso à Informação"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não é de Competência da OGE"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência da União/Federal"].index, inplace=True)
+ate_primeiro_por_assunto_ordenado = ate_primeiro_por_assunto.sort_values(by=['quantidade'],ascending=False)
+data_top = ate_primeiro_por_assunto_ordenado.head(10)
+data_top.reset_index(drop=True, inplace=True)
+
+st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023 para as solicitações:")
+fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 4 - Os 10 principais assuntos das Solicitações", color='quantidade', color_discrete_sequence=verde_claro)       
+fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(fig)
+if st.checkbox('Mostrar Todos os Assuntos das Solicitações'):
+    st.dataframe(ate_primeiro_por_assunto_ordenado)
+
 
 st.write("""
 ### 4.4 - ANÁLISE DAS MANIFESTAÇÕES – RECLAMAÇÕES
-
-
-### 4.5 - ANÁLISE DAS MANIFESTAÇÕES – DENÚNCIAS
-
-
-### 4.6 - ANÁLISE DAS MANIFESTAÇÕES – ELOGIOS
-
-
-### 4.7 - ANÁLISE DAS MANIFESTAÇÕES – SUGESTÕES
-
 """)
 
-# 5 - PERFIL DOS SOLICITANTES
-st.write(""" 
-## 5 - PERFIL DOS SOLICITANTES
-De acordo com os dados apresentados na tabela 2, que demonstra o perfil do manifestante, pode-se inferir que o demandante é, em sua maioria pessoa física do sexo feminino.
-""")
+atendimentos_reclamacoes = atendimentos_tratados[atendimentos_tratados["natureza"]=="Reclamação"]
+ate_primeiro_por_assunto = atendimentos_reclamacoes.groupby(['assunto']).size().to_frame('quantidade')
+ate_primeiro_por_assunto.reset_index(inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Manifestação Incompleta (Falta Dados)"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Devolução Para Proteção aos Dados do Usuário"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não Foi Possível Compreender"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Atendimento em Duplicidade"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência municipal"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Lei de Acesso à Informação"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não é de Competência da OGE"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência da União/Federal"].index, inplace=True)
+ate_primeiro_por_assunto_ordenado = ate_primeiro_por_assunto.sort_values(by=['quantidade'],ascending=False)
+data_top = ate_primeiro_por_assunto_ordenado.head(10)
+data_top.reset_index(drop=True, inplace=True)
 
-# 6 - OS 5 ÓRGÃOS COM MAIORES MANIFESTAÇÕES DE OUVIDORIA POR TIPOLOGIA E ASSUNTO
-st.write(""" 
-## 6 - OS 5 ÓRGÃOS COM MAIORES MANIFESTAÇÕES DE OUVIDORIA POR TIPOLOGIA E ASSUNTO
-""")
+st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023 para as solicitações:")
+fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 6 - Os 10 principais assuntos das Reclamações",color='quantidade', color_discrete_sequence=verde_claro)       
+fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(fig)
+if st.checkbox('Mostrar Todos os Assuntos das Reclamações'):
+    st.dataframe(ate_primeiro_por_assunto_ordenado)
+
+st.write("""### 4.5 - ANÁLISE DAS MANIFESTAÇÕES – DENÚNCIAS""")
+
+atendimentos_denuncias = atendimentos_tratados[atendimentos_tratados["natureza"]=="Denúncia"]
+ate_primeiro_por_assunto = atendimentos_denuncias.groupby(['assunto']).size().to_frame('quantidade')
+ate_primeiro_por_assunto.reset_index(inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Manifestação Incompleta (Falta Dados)"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Devolução Para Proteção aos Dados do Usuário"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não Foi Possível Compreender"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Atendimento em Duplicidade"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência municipal"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Lei de Acesso à Informação"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não é de Competência da OGE"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência da União/Federal"].index, inplace=True)
+ate_primeiro_por_assunto_ordenado = ate_primeiro_por_assunto.sort_values(by=['quantidade'],ascending=False)
+data_top = ate_primeiro_por_assunto_ordenado.head(10)
+data_top.reset_index(drop=True, inplace=True)
+
+st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023 para as denúncias:")
+fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 8 - Os 10 principais assuntos das Denúncias",color='quantidade', color_discrete_sequence=verde_claro)       
+fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(fig)
+if st.checkbox('Mostrar Todos os Assuntos das Denúncias'):
+    st.dataframe(ate_primeiro_por_assunto_ordenado)
+
+st.write("""### 4.6 - ANÁLISE DAS MANIFESTAÇÕES – ELOGIOS""")
+atendimentos_elogios = atendimentos_tratados[atendimentos_tratados["natureza"]=="Elogio"]
+ate_primeiro_por_assunto = atendimentos_elogios.groupby(['assunto']).size().to_frame('quantidade')
+ate_primeiro_por_assunto.reset_index(inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Manifestação Incompleta (Falta Dados)"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Devolução Para Proteção aos Dados do Usuário"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não Foi Possível Compreender"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Atendimento em Duplicidade"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência municipal"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Lei de Acesso à Informação"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não é de Competência da OGE"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência da União/Federal"].index, inplace=True)
+ate_primeiro_por_assunto_ordenado = ate_primeiro_por_assunto.sort_values(by=['quantidade'],ascending=False)
+data_top = ate_primeiro_por_assunto_ordenado.head(10)
+data_top.reset_index(drop=True, inplace=True)
+
+st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023 para os elogios:")
+fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 10 - Os 10 principais assuntos dos Elogios", color='quantidade', color_discrete_sequence=verde_claro)       
+fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(fig)
+if st.checkbox('Mostrar Todos os Assuntos dos Elogios'):
+    st.dataframe(ate_primeiro_por_assunto_ordenado)
+
          
+st.write("""### 4.7 - ANÁLISE DAS MANIFESTAÇÕES – SUGESTÕES""")
+atendimentos_sugestoes = atendimentos_tratados[atendimentos_tratados["natureza"]=="Sugestão"]
+ate_primeiro_por_assunto = atendimentos_sugestoes.groupby(['assunto']).size().to_frame('quantidade')
+ate_primeiro_por_assunto.reset_index(inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Manifestação Incompleta (Falta Dados)"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Devolução Para Proteção aos Dados do Usuário"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não Foi Possível Compreender"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Atendimento em Duplicidade"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência municipal"].index, inplace=True)
+#ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Lei de Acesso à Informação"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não é de Competência da OGE"].index, inplace=True)
+ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência da União/Federal"].index, inplace=True)
+ate_primeiro_por_assunto_ordenado = ate_primeiro_por_assunto.sort_values(by=['quantidade'],ascending=False)
+data_top = ate_primeiro_por_assunto_ordenado.head(10)
+data_top.reset_index(drop=True, inplace=True)
 
-if st.checkbox('Dados Abertos'):
+st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023 para as sugestões:")
+fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 12 - Os 10 principais assuntos das Sugestões", color='quantidade', color_discrete_sequence=verde_claro)       
+fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(fig)
+if st.checkbox('Mostrar Todos os Assuntos das Sugestões'):
+    st.dataframe(ate_primeiro_por_assunto_ordenado)
+
+
+###############################################################################
+# 5 - PERFIL DOS SOLICITANTES
+st.write(""" ## 5 - PERFIL DOS SOLICITANTES""")
+st.write("De acordo com os dados apresentados na tabela 2, que demonstra o perfil do manifestante, pode-se inferir que o demandante é, em sua maioria pessoa física do sexo feminino.")
+
+pizza = px.pie(atendimentos_tratados, values='quantidade', names='forma_atendimento', title='Gráfico 13 - Forma de Atendimento', color_discrete_sequence=cores_cge)
+pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(pizza)
+
+pizza = px.pie(atendimentos_tratados, values='quantidade', names='tipo_identificacao', title='Gráfico 14 - Tipo de Identificação', color_discrete_sequence=cores_cge)
+pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(pizza)
+
+pizza = px.pie(atendimentos_tratados, values='quantidade', names='tipo_pessoa', title='Gráfico 15 - Tipo do Solicitante', color_discrete_sequence=cores_cge)
+pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(pizza)
+
+pizza = px.pie(atendimentos_tratados, values='quantidade', names='sexo', title='Gráfico 16 - Sexo dos Solicitante', color_discrete_sequence=cores_cge)
+pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(pizza)
+
+
+
+##############################################################################################3
+# 6 - OS 5 ÓRGÃOS COM MAIORES MANIFESTAÇÕES DE OUVIDORIA POR TIPOLOGIA E ASSUNTO
+st.write(""" ## 6 - OS 5 ÓRGÃOS COM MAIORES MANIFESTAÇÕES DE OUVIDORIA POR TIPOLOGIA E ASSUNTO""")
+
+ate_por_orgao = atendimentos_tratados.groupby(['sigla_orgao_saida']).size().to_frame('quantidade')
+#st.dataframe(ate_por_orgao)
+ate_por_orgao.reset_index(inplace=True)
+ate_por_orgao.drop(ate_por_orgao[ate_por_orgao["sigla_orgao_saida"] == "Pronto Atendimento"].index, inplace=True)
+ate_por_orgao_ordenado = ate_por_orgao.sort_values(by=['quantidade'],ascending=False)
+ate_por_orgao_top = ate_por_orgao_ordenado.head(5)
+ate_por_orgao_top.reset_index(drop=True, inplace=True)
+lista_orgaos = ate_por_orgao_top["sigla_orgao_saida"].values.tolist()
+#st.dataframe(lista_orgaos)         
+tab1, tab2, tab3, tab4, tab5 = st.tabs(lista_orgaos)
+
+def montar_tabela_orgao(orgao, natureza):
+    reclamacoes_orgao = atendimentos_tratados.loc[(atendimentos_tratados["natureza"]==natureza) & (atendimentos_tratados["sigla_orgao_saida"]==orgao)]
+    #st.dataframe(reclamacoes_orgao)
+    reclamacoes_orgao_quantidade = reclamacoes_orgao.groupby(['assunto']).size().to_frame('quantidade')
+    reclamacoes_orgao_quantidade_ordenado = reclamacoes_orgao_quantidade.sort_values(by=['quantidade'],ascending=False)
+    reclamacoes_top = reclamacoes_orgao_quantidade_ordenado.head(5)
+    return reclamacoes_top
+
+
+
+with tab1:
+    orgao_analise = lista_orgaos[0]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)    
+
+with tab2:
+    orgao_analise = lista_orgaos[1]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)    
+with tab3:
+    orgao_analise = lista_orgaos[2]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)    
+
+with tab4:
+    orgao_analise = lista_orgaos[3]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)    
+
+with tab5:
+    orgao_analise = lista_orgaos[4]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia (Disque 100)")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia (Disque 100)")    
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)    
+
+# DADOS ABERTOS
+st.write(""" ## 7 - DADOS ABERTOS""")
+st.write("Os dados abertos podem ser encontrados também no Portal de Dados Abertos do Estado de Santa Catarina.")
+#http://dados.sc.gov.br/dataset/8f14904e-91c9-482e-9b3b-862aad886b52/resource/d9f2d5d2-14da-42a2-93ba-e63a57d6f7a9/download/pda.png
+if st.checkbox('Mostrar Dados Abertos'):
     st.subheader('Manifestações de Ouvidoria')
     st.dataframe(atendimentos)
     atendimentos_csv = convert_df(atendimentos)

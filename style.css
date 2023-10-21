@@ -1,8 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100&display=swap'); 
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Monserrat:wght@100&display=swap'); 
 
 html, body, [class*="css"] {
     font-family: 'Montserrat', sans-serif; 
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
-    color: #444242;
+    color: #424242;
 }

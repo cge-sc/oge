@@ -17,6 +17,7 @@ with open( "style.css" ) as css:
 
 cores_cge = ['#A1C222', '#38a64c','#008265', '#005c64', '#171717', '#424242', '#d5d6d7', '#e42320', '#33EE33', '#33FF33']
 verde_claro = ['#A1C222']
+cinza_escuro = ['#424242']
 
 # CARREGA OS DADOS
 def convert_df(df):
@@ -43,7 +44,7 @@ atendimentos_completo['quantidade'] = 1
 # CABEÇALHOS E FILTROS
 
 # TITULO DO APP
-st.title("Relatório de Ouvidoria")
+st.header("RELATÓRIO DE OUVIDORIA")
 
 # CAMPOS DE FILTRO
 ano = st.selectbox(
@@ -81,12 +82,13 @@ todos = pd.DataFrame([['Todos']])
 orgaos = pd.concat([orgaos, todos], ignore_index=False)
 orgaos = orgaos.dropna(axis='rows')
 
-orgao = st.selectbox(
-    'Selecione o órgão',
-    orgaos, index=quantidade_orgaos-1)
-
-if orgao != "Todos":
-    atendimentos = atendimentos.query('sigla_orgao_primeiro_encaminhamento == @orgao')
+#orgao = st.selectbox(
+#    'Selecione o órgão',
+#    orgaos, index=quantidade_orgaos-1)
+#
+#if orgao != "Todos":
+#    atendimentos = atendimentos.query('sigla_orgao_primeiro_encaminhamento == @orgao')
+orgao = 'Todos'
 
 # INPUT LIGAÇÕES TELEFÔNICAS
 ligacoes = st.number_input('Quantidade de ligações no período', min_value=1, value=999, step=1)
@@ -122,8 +124,9 @@ quantidade_tratados_encaminhados_fora_prazo = len(atendimentos_encaminhados[aten
 
 ###############################################################
 # 1 - ATENDIMENTO DE OUVIDORIA
-st.write(""" 
-## 1 - ATENDIMENTO DE OUVIDORIA
+###############################################################
+st.header("1 - ATENDIMENTO DE OUVIDORIA")
+st.write("""  
 O Atendimento de Ouvidoria se inicia a partir do contato realizado pelo usuário de produtos e serviços do governo estadual por meio de telefone, sistema informatizado de ouvidoria – Sistema OUV, carta, e-mail ou presencialmente.	
 Após o registro da manifestação, a Ouvidoria-Geral procede à análise preliminar da manifestação. 
 
@@ -134,9 +137,7 @@ que analisa a resposta e envia a Decisão Administrativa Final ao usuário no pr
 
 #####################################################################
 # 2 - MANIFESTAÇÕES POR ÓRGÃO OU ENTIDADE DO PODER EXECUTIVO
-st.write("""
-## 2 - MANIFESTAÇÕES POR ÓRGÃO OU ENTIDADE DO PODER EXECUTIVO
-""")
+st.header("2 - MANIFESTAÇÕES POR ÓRGÃO OU ENTIDADE DO PODER EXECUTIVO")
 st.write("A Ouvidoria-Geral do Estado registrou " + str(quantidade_atendimentos) + 
          " manifestações no " + str(relatorio) + " de " + str(ano) + ", sendo que " + str(quantidade_encaminhados) + " foram encaminhadas aos órgãos e entidades do Poder Executivo Estadual em razão da pertinência da matéria; " + 
         str(quantidade_pronto_atendimento) + " são demandas de ouvidoria com pronto atendimento; " + str(quantidade_transferidos) + " manifestações transferidas ao sistema de informação ao cidadão (E-SIC); " +
@@ -196,17 +197,16 @@ if orgao == 'Todos':
     # TABELA 1 - Tabela 1 - Manifestações recebidas por Tipo, segundo os órgãos e entidades do Poder Executivo
     st.write("TABELA 1 - Tabela 1 - Manifestações recebidas por Tipo, segundo os órgãos e entidades do Poder Executivo")
     st.dataframe(atendimentos_tabela_pivot)
-    st.write("Fonte: Sistema OUV. " + hoje)
+    st.caption("Fonte: Sistema OUV. " + hoje)
 
 
 ##################################################################
 # 3 - RESULTADOS DA OUVIDORIA NO PERÍODO
+st.header("3 - RESULTADOS DA OUVIDORIA NO PERÍODO")
 st.write(""" 
-## 3 - RESULTADOS DA OUVIDORIA NO PERÍODO
 O desempenho das atividades da Ouvidoria é medido por meio de indicadores, cujos resultados são acompanhados periodicamente.
 
 Uma das principais competências das unidades de ouvidoria é fornecer aos órgãos e entidades informações sobre as necessidades dos cidadãos para que possa melhorar continuamente seus processos, produtos e serviços. Um adequado sistema de registro das demandas facilita o levantamento dessas informações, bem como, o acesso a outros dados do órgão ou da entidade.
-
 """)
 
 st.write("Visão Geral – Período: " + str(start_date) + " a " + str(end_date))
@@ -356,6 +356,7 @@ st.write("""
 ### 4.2 - ASSUNTOS MAIS DEMANDADOS
 """)
 atendimentos_solicitacoes = atendimentos_tratados[atendimentos_tratados["natureza"]=="Solicitação"]
+
 ate_primeiro_por_assunto = atendimentos_tratados.groupby(['assunto']).size().to_frame('quantidade')
 ate_primeiro_por_assunto.reset_index(inplace=True)
 ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Manifestação Incompleta (Falta Dados)"].index, inplace=True)
@@ -378,14 +379,15 @@ st.plotly_chart(fig)
 if st.checkbox('Mostrar Todos os Assuntos'):
     st.dataframe(ate_primeiro_por_assunto_ordenado)
 
-st.write("""
-### 4.3 - ANÁLISE DAS MANIFESTAÇÕES – SOLICITAÇÕES
-Apresentamos o ranking dos 10 assuntos mais demandados no período para as solictações.
-""")
+st.write(""" ### 4.3 - ANÁLISE DAS MANIFESTAÇÕES – SOLICITAÇÕES""")
 
 atendimentos_solicitacoes = atendimentos_tratados[atendimentos_tratados["natureza"]=="Solicitação"]
+
 ate_primeiro_por_assunto = atendimentos_solicitacoes.groupby(['assunto']).size().to_frame('quantidade')
+ate_primeiro_por_orgao = atendimentos_solicitacoes.groupby(['sigla_orgao_saida']).size().to_frame('quantidade')
 ate_primeiro_por_assunto.reset_index(inplace=True)
+ate_primeiro_por_orgao.reset_index(inplace=True)
+
 ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Manifestação Incompleta (Falta Dados)"].index, inplace=True)
 #ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Devolução Para Proteção aos Dados do Usuário"].index, inplace=True)
 ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não Foi Possível Compreender"].index, inplace=True)
@@ -394,22 +396,37 @@ ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto[
 #ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Lei de Acesso à Informação"].index, inplace=True)
 ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não é de Competência da OGE"].index, inplace=True)
 ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência da União/Federal"].index, inplace=True)
+ate_primeiro_por_orgao.drop(ate_primeiro_por_orgao[ate_primeiro_por_orgao["sigla_orgao_saida"] == "Pronto Atendimento"].index, inplace=True)
+
+ate_primeiro_por_orgao_ordenado = ate_primeiro_por_orgao.sort_values(by=['quantidade'],ascending=False)
+orgaos_top = ate_primeiro_por_orgao_ordenado.head(10)
+orgaos_top.reset_index(drop=False, inplace=True)
+
+
 ate_primeiro_por_assunto_ordenado = ate_primeiro_por_assunto.sort_values(by=['quantidade'],ascending=False)
-data_top = ate_primeiro_por_assunto_ordenado.head(10)
-data_top.reset_index(drop=True, inplace=True)
+assuntos_top = ate_primeiro_por_assunto_ordenado.head(10)
+assuntos_top.reset_index(drop=True, inplace=True)
+
+st.write("Solicitação: requerimento de adoção de providência por parte da Administração Pública Estadual. ")
+st.write("No período, foram recepcionadas " + str(quantidade_solicitacoes) + " solicitações de providências, incluindo 98 Pedidos de Acesso à Informação que não apresentaram os requisitos legais para efetuar a transferência ao E-SIC.")
+
+fig=px.histogram(orgaos_top, x='quantidade',y='sigla_orgao_saida', orientation='h', title="Gráfico 3 - Manifestações do tipo Solicitação, por órgão ou entidade (10 mais demandados)", color='quantidade', color_discrete_sequence=cinza_escuro)       
+fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
+st.plotly_chart(fig)
+if st.checkbox('Mostrar Todos os Órgãos das Solicitações'):
+    st.dataframe(ate_primeiro_por_orgao_ordenado)
+
 
 st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023 para as solicitações:")
-fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 4 - Os 10 principais assuntos das Solicitações", color='quantidade', color_discrete_sequence=verde_claro)       
+fig=px.histogram(assuntos_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 4 - Os 10 principais assuntos das Solicitações", color='quantidade', color_discrete_sequence=verde_claro)       
 fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(fig)
 if st.checkbox('Mostrar Todos os Assuntos das Solicitações'):
     st.dataframe(ate_primeiro_por_assunto_ordenado)
 
-
 st.write("""
-### 4.4 - ANÁLISE DAS MANIFESTAÇÕES – RECLAMAÇÕES
-""")
-
+### 4.4 - ANÁLISE DAS MANIFESTAÇÕES – RECLAMAÇÕES """)
+st.write("Reclamação: demonstração de insatisfação relativa ao serviço ou à política pública.")
 atendimentos_reclamacoes = atendimentos_tratados[atendimentos_tratados["natureza"]=="Reclamação"]
 ate_primeiro_por_assunto = atendimentos_reclamacoes.groupby(['assunto']).size().to_frame('quantidade')
 ate_primeiro_por_assunto.reset_index(inplace=True)
@@ -524,8 +541,6 @@ st.plotly_chart(pizza)
 pizza = px.pie(atendimentos_tratados, values='quantidade', names='sexo', title='Gráfico 16 - Sexo dos Solicitante', color_discrete_sequence=cores_cge)
 pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(pizza)
-
-
 
 ##############################################################################################3
 # 6 - OS 5 ÓRGÃOS COM MAIORES MANIFESTAÇÕES DE OUVIDORIA POR TIPOLOGIA E ASSUNTO

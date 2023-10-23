@@ -82,7 +82,7 @@ else:
     periodicidade = "ANUAL"
     periodo = str(ano)    
 
-atendimentos = atendimentos_completo.query('data_atendimento >= @start_date and data_atendimento <= @end_date')
+atendimentos_periodo = atendimentos_completo.query('data_atendimento >= @start_date and data_atendimento <= @end_date')
 
 # FILTRO ÓRGÃO
 #orgaos = pd.DataFrame(atendimentos['sigla_orgao_saida'].unique())
@@ -97,7 +97,7 @@ atendimentos = atendimentos_completo.query('data_atendimento >= @start_date and 
 #    orgaos, index=quantidade_orgaos-1)
 #
 #if orgao != "Todos":
-#    atendimentos = atendimentos.query('sigla_orgao_primeiro_encaminhamento == @orgao')
+#    atendimentos_periodo = atendimentos.query('sigla_orgao_primeiro_encaminhamento == @orgao')
 orgao = 'Todos'
 
 # INPUT LIGAÇÕES TELEFÔNICAS
@@ -106,18 +106,18 @@ ligacoes = st.number_input('Quantidade de ligações no período', min_value=1, 
 #FILTRO OPÇÕES
 conta_transferidos = st.checkbox('Contabiliza Transferidos', value=True)
 conta_pronto = st.checkbox('Contabiliza Pronto Atendimento', value=True)
-junta_denuncias = st.checkbox('Consolida Denúncias (Disque 100))', value=True)
+junta_denuncias = st.checkbox('Consolida Denúncias (Disque 100)', value=True)
 
 # TOTALIZADORES
-atendimentos_tratados = atendimentos[(atendimentos["transferido"]!="Transferido") & (atendimentos["status"]=="Concluido")]
+atendimentos_tratados = atendimentos_periodo[(atendimentos_periodo["transferido"]!="Transferido") & (atendimentos_periodo["status"]=="Concluido")]
 #st.write("Tratados: " + str(len(atendimentos_tratados)))
-atendimentos_encaminhados = atendimentos[(atendimentos["transferido"]=="Normal") & (atendimentos["status"]!="Concluido")]
+atendimentos_encaminhados = atendimentos_periodo[(atendimentos_periodo["transferido"]=="Normal") & (atendimentos_periodo["status"]!="Concluido")]
 #st.write("Em tratamento: " + str(len(atendimentos_encaminhados)))
-atendimentos_transferidos = atendimentos[atendimentos["transferido"]=="Transferido"]
+atendimentos_transferidos = atendimentos_periodo[atendimentos_periodo["transferido"]=="Transferido"]
 #st.write("Transferidos: " + str(len(atendimentos_transferidos)))
-atendimentos_pronto = atendimentos[atendimentos["sigla_orgao_saida"]=="Pronto Atendimento"]
+atendimentos_pronto = atendimentos_periodo[atendimentos_periodo["sigla_orgao_saida"]=="Pronto Atendimento"]
 #st.write("Pronto Atendimento: " + str(len(atendimentos_pronto)))
-atendimentos_orgaos = atendimentos[atendimentos["sigla_orgao_saida"]!="Pronto Atendimento"]
+atendimentos_orgaos = atendimentos_periodo[atendimentos_periodo["sigla_orgao_saida"]!="Pronto Atendimento"]
 #st.write("Encaminhados: " + str(len(atendimentos_orgaos)))
 
 if conta_transferidos:
@@ -131,8 +131,8 @@ if junta_denuncias:
 
 quantidade_pronto_atendimento = len(atendimentos_pronto)
 quantidade_transferidos = len(atendimentos_transferidos)
-quantidade_telefonemas = len(atendimentos[atendimentos["forma_atendimento"]=="Telefone"])
-quantidade_encaminhados = len(atendimentos_orgaos)
+quantidade_telefonemas = len(atendimentos_periodo[atendimentos_periodo["forma_atendimento"]=="Telefone"])
+quantidade_encaminhados = len(atendimentos_orgaos) - quantidade_transferidos
 quantidade_tratados = len(atendimentos_tratados)
 quantidade_atendimentos = len(atendimentos_tratados) + len(atendimentos_encaminhados)
 quantidade_tratados_concluidos = len(atendimentos_tratados[atendimentos_tratados["status"]=="Concluido"])
@@ -171,8 +171,8 @@ st.write("A Ouvidoria-Geral do Estado registrou " + str(quantidade_atendimentos)
         str(quantidade_pronto_atendimento) + " são demandas de ouvidoria com pronto atendimento; " + str(quantidade_transferidos) + " manifestações transferidas ao sistema de informação ao cidadão (E-SIC).")
 st.write("Por meio do atendimento telefônico (0800), foram recebidas " + str(ligacoes) + " ligações recebidas no 0800 sendo " + str(quantidade_telefonemas) + " convertidas manifestações de ouvidorias.")
 st.write("Ressaltamos que cada órgão ou entidade da Administração Pública Estadual possui especificidades e características próprias, definidas pelos serviços prestados à população.")
-
-atendimentos_tabela = atendimentos.groupby(['sigla_orgao_saida','natureza']).size().to_frame('quantidade')
+atendimentos_totais = pd.concat([atendimentos_tratados, atendimentos_encaminhados], ignore_index=False)
+atendimentos_tabela = atendimentos_totais.groupby(['sigla_orgao_saida','natureza']).size().to_frame('quantidade')
 atendimentos_tabela_pivot = pd.pivot_table(atendimentos_tabela, index='sigla_orgao_saida', values='quantidade', columns='natureza', aggfunc='sum' )
 atendimentos_tabela_pivot.rename({'sigla_orgao_saida': 'Órgão'}, axis=1, inplace=True)
 
@@ -430,7 +430,7 @@ ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto[
 #ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Lei de Acesso à Informação"].index, inplace=True)
 ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não é de Competência da OGE"].index, inplace=True)
 ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência da União/Federal"].index, inplace=True)
-ate_primeiro_por_orgao.drop(ate_primeiro_por_orgao[ate_primeiro_por_orgao["sigla_orgao_saida"] == "Pronto Atendimento"].index, inplace=True)
+#ate_primeiro_por_orgao.drop(ate_primeiro_por_orgao[ate_primeiro_por_orgao["sigla_orgao_saida"] == "Pronto Atendimento"].index, inplace=True)
 
 ate_primeiro_por_orgao_ordenado = ate_primeiro_por_orgao.sort_values(by=['quantidade'],ascending=False)
 orgaos_top = ate_primeiro_por_orgao_ordenado.head(10)
@@ -540,7 +540,7 @@ if st.checkbox('Mostrar Todos os Órgãos das Denúncias'):
     st.dataframe(ate_primeiro_por_orgao_ordenado)
 
 st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023 para as denúncias:")
-fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 8 - Os 10 principais assuntos das Denúncias",color='quantidade', color_discrete_sequence=verde_claro)       
+fig=px.histogram(assuntos_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 8 - Os 10 principais assuntos das Denúncias",color='quantidade', color_discrete_sequence=verde_claro)       
 fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(fig)
 if st.checkbox('Mostrar Todos os Assuntos das Denúncias'):
@@ -562,7 +562,8 @@ ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto[
 #ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Lei de Acesso à Informação"].index, inplace=True)
 ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Não é de Competência da OGE"].index, inplace=True)
 ate_primeiro_por_assunto.drop(ate_primeiro_por_assunto[ate_primeiro_por_assunto["assunto"] == "Competência da União/Federal"].index, inplace=True)
-#ate_primeiro_por_orgao.drop(ate_primeiro_por_orgao[ate_primeiro_por_orgao["sigla_orgao_saida"] == "Pronto Atendimento"].index, inplace=True)
+ate_primeiro_por_orgao.drop(ate_primeiro_por_orgao[ate_primeiro_por_orgao["sigla_orgao_saida"] == "Pronto Atendimento"].index, inplace=True)
+
 
 ate_primeiro_por_orgao_ordenado = ate_primeiro_por_orgao.sort_values(by=['quantidade'],ascending=False)
 orgaos_top = ate_primeiro_por_orgao_ordenado.head(10)
@@ -583,7 +584,7 @@ if st.checkbox('Mostrar Todos os Órgãos dos Elogios'):
 
 
 st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023 para os elogios:")
-fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 10 - Os 10 principais assuntos dos Elogios", color='quantidade', color_discrete_sequence=verde_claro)       
+fig=px.histogram(assuntos_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 10 - Os 10 principais assuntos dos Elogios", color='quantidade', color_discrete_sequence=verde_claro)       
 fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(fig)
 if st.checkbox('Mostrar Todos os Assuntos dos Elogios'):
@@ -626,11 +627,12 @@ if st.checkbox('Mostrar Todos os Órgãos das Sugestões'):
     st.dataframe(ate_primeiro_por_orgao_ordenado)
 
 st.write("Apresentamos o ranking dos 10 assuntos mais demandados nesse trimestre de 2023 para as sugestões:")
-fig=px.histogram(data_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 12 - Os 10 principais assuntos das Sugestões", color='quantidade', color_discrete_sequence=verde_claro)       
+fig=px.histogram(assuntos_top, x='quantidade',y='assunto', orientation='h', title="Gráfico 12 - Os 10 principais assuntos das Sugestões", color='quantidade', color_discrete_sequence=verde_claro)       
 fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(fig)
 if st.checkbox('Mostrar Todos os Assuntos das Sugestões'):
     st.dataframe(ate_primeiro_por_assunto_ordenado)
+
 
 
 ###############################################################################

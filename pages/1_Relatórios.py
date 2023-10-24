@@ -36,6 +36,29 @@ atendimentos_completo = carrega_dados()
 
 # LIMPAR ARQUIVO
 atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('Sem Tramit.','Pronto Atendimento')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('SSP','Secretaria De Estado da Segurança Pública')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('DETRAN','Departamento Estadual de Trânsito de Santa Catarina')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('CONIN-PM','Controladoria Interna da PM')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('SDC','Secretaria de Estado da Proteção Defesa Civil')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('SES','Secretaria de Estado da Saúde')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('SIE','Secretaria de Estado da Infraestrutura e Mobilidade')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('SED','Secretaria de Estado da Educação')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('IMA','Instituto do Meio Ambiente do Estado de Santa Catarina')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('SAS','Secretaria de Estado da Assistência Social, Mulher e Família')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('PC','Polícia Civil')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('CBM/SC','Corpo de Bombeiros Militares de SC')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('CIDASC','Companhia Integrada de Desenvolvimento Agrícola')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('SAP','Secretaria de Estado da Administração Prisional e Social')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('CASAN','Companhia Catarinense de Águas e Saneamento')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('ARESC','Agência de Regulamentação de Serviços Públicos de Santa Catarina')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('CEASA','Centrais de Abastecimento do Estado de Santa Catarina')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('CELESC','Centrais Elétricas de Santa Catarina')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('COAD/CGE','Coordenação de Admissibilidade de Denúncias')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('CGE','Controladoria-Geral do Estado de Santa Catarina')
+#atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('CIASC','Centro de Informática e Automação do Estado de Santa Catarina')
+
+atendimentos_completo['natureza'] = atendimentos_completo['natureza'].str.replace('Denúncia (Disque 100)','Denúncia')
+atendimentos_completo['natureza'] = atendimentos_completo['natureza'].str.replace('Solicitação Documentos/Informações/Lei de Acesso à Informação','Solicitação')
 atendimentos_completo.loc[atendimentos_completo["transferido"]=="Transferido", 'sigla_orgao_saida'] = 'Transferida'
 atendimentos_completo.data_conclusao.fillna(hoje, inplace=True) 
 atendimentos_completo[['data_conclusao','data_atendimento']] = atendimentos_completo[['data_conclusao','data_atendimento']].apply(pd.to_datetime)
@@ -107,7 +130,6 @@ ligacoes = st.number_input('Quantidade de ligações no período', min_value=1, 
 #FILTRO OPÇÕES
 conta_transferidos = st.checkbox('Contabiliza Transferidos', value=True)
 conta_pronto = st.checkbox('Contabiliza Pronto Atendimento', value=True)
-junta_denuncias = st.checkbox('Consolida Denúncias (Disque 100)', value=True)
 
 # TOTALIZADORES
 st.write("Total: " + str(len(atendimentos_periodo)))
@@ -128,8 +150,7 @@ if conta_pronto:
     print("ok")
 else:
     atendimentos_tratados.drop(atendimentos_tratados[atendimentos_tratados["sigla_orgao_saida"] == "Pronto Atendimento"].index, inplace=True)
-if junta_denuncias:
-    atendimentos_tratados['natureza'] = atendimentos_completo['natureza'].str.replace('Denúncia (Disque 100)','Denúncia')
+
 
 quantidade_pronto_atendimento = len(atendimentos_pronto)
 quantidade_transferidos = len(atendimentos_transferidos)
@@ -188,10 +209,10 @@ if "Denúncia" in atendimentos_tabela_pivot.columns:
     denuncias = atendimentos_tabela_pivot["Denúncia"].sum()
 else:
     denuncias = 0
-if "Denúncia (Disque 100)" in atendimentos_tabela_pivot.columns:
-    disque100 = atendimentos_tabela_pivot["Denúncia (Disque 100)"].sum()
-else:
-    disque100 = 0
+#if "Denúncia (Disque 100)" in atendimentos_tabela_pivot.columns:
+#    disque100 = atendimentos_tabela_pivot["Denúncia (Disque 100)"].sum()
+#else:
+#    disque100 = 0
 if "Elogio" in atendimentos_tabela_pivot.columns:
     elogios = atendimentos_tabela_pivot["Elogio"].sum()
 else:
@@ -210,20 +231,20 @@ else:
     sugestoes = 0
 if "Solicitação Documentos/Informações/Lei de Acesso à Informação" in atendimentos_tabela_pivot.columns:
     lais = atendimentos_tabela_pivot["Solicitação Documentos/Informações/Lei de Acesso à Informação"].sum()
-    totalizador = pd.DataFrame([["Total", denuncias, disque100, elogios, reclamacoes, solicitacoes, lais, sugestoes]])
-    totalizador.columns = ["sigla_orgao", "Denúncia", "Denúncia (Disque 100)", "Elogio", "Reclamação", "Solicitação", "Solicitação Documentos/Informações/Lei de Acesso à Informação", "Sugestão"]
+    totalizador = pd.DataFrame([["Total", denuncias, elogios, reclamacoes, solicitacoes, lais, sugestoes]])
+    totalizador.columns = ["sigla_orgao", "Denúncia", "Elogio", "Reclamação", "Solicitação", "Solicitação Documentos/Informações/Lei de Acesso à Informação", "Sugestão"]
 else:
-    totalizador = pd.DataFrame([["Total", denuncias, disque100, elogios, reclamacoes, solicitacoes, sugestoes]])
-    totalizador.columns = ["sigla_orgao", "Denúncia", "Denúncia (Disque 100)", "Elogio", "Reclamação", "Solicitação", "Sugestão"]
+    totalizador = pd.DataFrame([["Total", denuncias, elogios, reclamacoes, solicitacoes, sugestoes]])
+    totalizador.columns = ["sigla_orgao", "Denúncia", "Elogio", "Reclamação", "Solicitação", "Sugestão"]
 totalizador = totalizador.set_index("sigla_orgao")
 
 if orgao == 'Todos':
     atendimentos_tabela_pivot = pd.concat([atendimentos_tabela_pivot, totalizador], ignore_index=False)
     atendimentos_tabela_pivot = atendimentos_tabela_pivot.fillna(0)
     if "Solicitação Documentos/Informações/Lei de Acesso à Informação" in atendimentos_tabela_pivot.columns:
-        atendimentos_tabela_pivot["Total"] = atendimentos_tabela_pivot["Denúncia"] + atendimentos_tabela_pivot["Denúncia (Disque 100)"] + atendimentos_tabela_pivot["Elogio"] + atendimentos_tabela_pivot["Reclamação"] + atendimentos_tabela_pivot["Solicitação"] + atendimentos_tabela_pivot["Solicitação Documentos/Informações/Lei de Acesso à Informação"] + atendimentos_tabela_pivot["Sugestão"]
+        atendimentos_tabela_pivot["Total"] = atendimentos_tabela_pivot["Denúncia"] + atendimentos_tabela_pivot["Elogio"] + atendimentos_tabela_pivot["Reclamação"] + atendimentos_tabela_pivot["Solicitação"] + atendimentos_tabela_pivot["Solicitação Documentos/Informações/Lei de Acesso à Informação"] + atendimentos_tabela_pivot["Sugestão"]
     else:
-        atendimentos_tabela_pivot["Total"] = atendimentos_tabela_pivot["Denúncia"] + atendimentos_tabela_pivot["Denúncia (Disque 100)"] + atendimentos_tabela_pivot["Elogio"] + atendimentos_tabela_pivot["Reclamação"] + atendimentos_tabela_pivot["Solicitação"] + atendimentos_tabela_pivot["Sugestão"]
+        atendimentos_tabela_pivot["Total"] = atendimentos_tabela_pivot["Denúncia"] + atendimentos_tabela_pivot["Elogio"] + atendimentos_tabela_pivot["Reclamação"] + atendimentos_tabela_pivot["Solicitação"] + atendimentos_tabela_pivot["Sugestão"]
     # TABELA 1 - Tabela 1 - Manifestações recebidas por Tipo, segundo os órgãos e entidades do Poder Executivo
     st.write("TABELA 1 - Tabela 1 - Manifestações recebidas por Tipo, segundo os órgãos e entidades do Poder Executivo")
     st.dataframe(atendimentos_tabela_pivot)
@@ -375,12 +396,8 @@ percentual_sugestoes = round((quantidade_sugestoes * 100) / quantidade_atendimen
 st.header("4 - RESULTADOS DO PERÍODO")
 st.subheader("4.1 TIPOS DE MANIFESTAÇÕES")
 
-if junta_denuncias:
-    st.write("A maior parte das manifestações (" + str(percentual_solicitacoes) + "%) atendidas pela Ouvidoria pertence ao tipo Solicitação. O tipo Reclamação, alcança percentual bem menor (" + str(percentual_reclamacoes) + "%), Denúncias (" + str(percentual_denuncias) + "%), Elogios (" + str(percentual_elogios) + "%) e Sugestões (" + str(percentual_sugestoes) + "%).")
-else:
-    quantidade_disque100 = int(ate_primeiro_por_natureza.query("natureza == 'Denúncia (Disque 100)'").values[0])
-    percentual_disque100 = round((quantidade_disque100 * 100) / quantidade_atendimentos_tratados, 2)
-    st.write("A maior parte das manifestações (" + str(percentual_solicitacoes) + "%) atendidas pela Ouvidoria pertence ao tipo Solicitação. O tipo Reclamação, alcança percentual bem menor (" + str(percentual_reclamacoes) + "%), Denúncias (" + str(percentual_denuncias) + "%), Denúncias - Disque 100 (" + str(percentual_disque100) + "%), Elogios (" + str(percentual_elogios) + "%) e Sugestões (" + str(percentual_sugestoes) + "%).")
+
+st.write("A maior parte das manifestações (" + str(percentual_solicitacoes) + "%) atendidas pela Ouvidoria pertence ao tipo Solicitação. O tipo Reclamação, alcança percentual bem menor (" + str(percentual_reclamacoes) + "%), Denúncias (" + str(percentual_denuncias) + "%), Elogios (" + str(percentual_elogios) + "%) e Sugestões (" + str(percentual_sugestoes) + "%).")
 pizza = px.pie(atendimentos_tratados, values='quantidade', names='natureza', title='Gráfico 1 - Tipologia das Manifestações', color_discrete_sequence=cores_cge)
 pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(pizza)

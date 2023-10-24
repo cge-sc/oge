@@ -36,6 +36,7 @@ atendimentos_completo = carrega_dados()
 
 # LIMPAR ARQUIVO
 atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('Sem Tramit.','Pronto Atendimento')
+atendimentos_completo.loc[atendimentos_completo["transferido"]=="Transferido", 'sigla_orgao_saida'] = 'Transferida'
 atendimentos_completo.data_conclusao.fillna(hoje, inplace=True) 
 atendimentos_completo[['data_conclusao','data_atendimento']] = atendimentos_completo[['data_conclusao','data_atendimento']].apply(pd.to_datetime)
 atendimentos_completo['prazo_atendimento'] = (atendimentos_completo['data_conclusao'] - atendimentos_completo['data_atendimento']).dt.days
@@ -109,16 +110,17 @@ conta_pronto = st.checkbox('Contabiliza Pronto Atendimento', value=True)
 junta_denuncias = st.checkbox('Consolida Denúncias (Disque 100)', value=True)
 
 # TOTALIZADORES
+st.write("Total: " + str(len(atendimentos_periodo)))
 atendimentos_tratados = atendimentos_periodo[(atendimentos_periodo["transferido"]!="Transferido") & (atendimentos_periodo["status"]=="Concluido")]
-#st.write("Tratados: " + str(len(atendimentos_tratados)))
+st.write("Tratados: " + str(len(atendimentos_tratados)))
 atendimentos_encaminhados = atendimentos_periodo[(atendimentos_periodo["transferido"]=="Normal") & (atendimentos_periodo["status"]!="Concluido")]
-#st.write("Em tratamento: " + str(len(atendimentos_encaminhados)))
+st.write("Em tratamento: " + str(len(atendimentos_encaminhados)))
 atendimentos_transferidos = atendimentos_periodo[atendimentos_periodo["transferido"]=="Transferido"]
-#st.write("Transferidos: " + str(len(atendimentos_transferidos)))
+st.write("Transferidos: " + str(len(atendimentos_transferidos)))
 atendimentos_pronto = atendimentos_periodo[atendimentos_periodo["sigla_orgao_saida"]=="Pronto Atendimento"]
-#st.write("Pronto Atendimento: " + str(len(atendimentos_pronto)))
+st.write("Pronto Atendimento: " + str(len(atendimentos_pronto)))
 atendimentos_orgaos = atendimentos_periodo[atendimentos_periodo["sigla_orgao_saida"]!="Pronto Atendimento"]
-#st.write("Encaminhados: " + str(len(atendimentos_orgaos)))
+st.write("Encaminhados: " + str(len(atendimentos_orgaos)))
 
 if conta_transferidos:
     atendimentos_tratados = pd.concat([atendimentos_tratados, atendimentos_transferidos], ignore_index=False)
@@ -176,11 +178,11 @@ atendimentos_tabela = atendimentos_totais.groupby(['sigla_orgao_saida','natureza
 atendimentos_tabela_pivot = pd.pivot_table(atendimentos_tabela, index='sigla_orgao_saida', values='quantidade', columns='natureza', aggfunc='sum' )
 atendimentos_tabela_pivot.rename({'sigla_orgao_saida': 'Órgão'}, axis=1, inplace=True)
 
-if conta_transferidos:
-    transferidos = pd.DataFrame([["Transferidos", 0, 0, 0, 0, quantidade_transferidos, 0]])
-    transferidos.columns = ["sigla_orgao", "Denúncia", "Denúncia (Disque 100)", "Elogio", "Reclamação", "Solicitação", "Sugestão"]
-    transferidos = transferidos.set_index("sigla_orgao")
-    atendimentos_tabela_pivot = pd.concat([atendimentos_tabela_pivot, transferidos], ignore_index=False)
+#if conta_transferidos:
+#    transferidos = pd.DataFrame([["Transferidos", 0, 0, 0, 0, quantidade_transferidos, 0]])
+#    transferidos.columns = ["sigla_orgao", "Denúncia", "Denúncia (Disque 100)", "Elogio", "Reclamação", "Solicitação", "Sugestão"]
+#    transferidos = transferidos.set_index("sigla_orgao")
+#    atendimentos_tabela_pivot = pd.concat([atendimentos_tabela_pivot, transferidos], ignore_index=False)
 
 if "Denúncia" in atendimentos_tabela_pivot.columns:
     denuncias = atendimentos_tabela_pivot["Denúncia"].sum()
@@ -531,7 +533,7 @@ assuntos_top = ate_primeiro_por_assunto_ordenado.head(10)
 assuntos_top.reset_index(drop=True, inplace=True)
 
 st.write("Denúncias: comunicação de prática de irregularidades ou ato ilícito cuja solução dependa da atuação dos órgãos apuratórios competentes.")
-st.write("No período, foram recepcionadas " + str(quantidade_denuncias) + " reclamações de providências, que são consideradas como demonstração de insatisfação")
+st.write("No período, foram recepcionadas " + str(quantidade_denuncias) + " denúncias, que são consideradas como demonstração de insatisfação")
 
 fig=px.histogram(orgaos_top, x='quantidade',y='sigla_orgao_saida', orientation='h', title="Gráfico 7 - Manifestações do tipo Denúncia, por órgão ou entidade (10 mais demandados)", color='quantidade', color_discrete_sequence=cinza_escuro)       
 fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
@@ -574,7 +576,7 @@ assuntos_top = ate_primeiro_por_assunto_ordenado.head(10)
 assuntos_top.reset_index(drop=True, inplace=True)
 
 st.write("Elogios: comunicação de prática de irregularidades ou ato ilícito cuja solução dependa da atuação dos órgãos apuratórios competentes.")
-st.write("No período, foram recepcionadas " + str(quantidade_elogios) + " reclamações de providências, que são consideradas como demonstração de insatisfação")
+st.write("No período, foram recepcionados " + str(quantidade_elogios) + " elogios, que são consideradas como demonstração de insatisfação")
 
 fig=px.histogram(orgaos_top, x='quantidade',y='sigla_orgao_saida', orientation='h', title="Gráfico 9 - Manifestações do tipo Elogio, por órgão ou entidade (10 mais demandados)", color='quantidade', color_discrete_sequence=cinza_escuro)       
 fig.update_layout(yaxis={'categoryorder':'total ascending'}, showlegend=False, font_family="Roboto", titlefont_family="Roboto")
@@ -639,20 +641,19 @@ if st.checkbox('Mostrar Todos os Assuntos das Sugestões'):
 # 5 - PERFIL DOS SOLICITANTES
 st.write(""" ## 5 - PERFIL DOS SOLICITANTES""")
 st.write("De acordo com os dados apresentados na tabela 2, que demonstra o perfil do manifestante, pode-se inferir que o demandante é, em sua maioria pessoa física do sexo feminino.")
-
-pizza = px.pie(atendimentos_tratados, values='quantidade', names='forma_atendimento', title='Gráfico 13 - Forma de Atendimento', color_discrete_sequence=cores_cge)
+pizza = px.pie(atendimentos_periodo, values='quantidade', names='forma_atendimento', title='Gráfico 13 - Forma de Atendimento', color_discrete_sequence=cores_cge)
 pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(pizza)
 
-pizza = px.pie(atendimentos_tratados, values='quantidade', names='tipo_identificacao', title='Gráfico 14 - Tipo de Identificação', color_discrete_sequence=cores_cge)
+pizza = px.pie(atendimentos_periodo, values='quantidade', names='tipo_identificacao', title='Gráfico 14 - Tipo de Identificação', color_discrete_sequence=cores_cge)
 pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(pizza)
 
-pizza = px.pie(atendimentos_tratados, values='quantidade', names='tipo_pessoa', title='Gráfico 15 - Tipo do Solicitante', color_discrete_sequence=cores_cge)
+pizza = px.pie(atendimentos_periodo, values='quantidade', names='tipo_pessoa', title='Gráfico 15 - Tipo do Solicitante', color_discrete_sequence=cores_cge)
 pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(pizza)
 
-pizza = px.pie(atendimentos_tratados, values='quantidade', names='sexo', title='Gráfico 16 - Sexo dos Solicitante', color_discrete_sequence=cores_cge)
+pizza = px.pie(atendimentos_periodo, values='quantidade', names='sexo', title='Gráfico 16 - Sexo dos Solicitante', color_discrete_sequence=cores_cge)
 pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(pizza)
 
@@ -760,9 +761,6 @@ with tab5:
     st.write("Denúncia")
     dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
     st.dataframe(dados_tabela)
-    st.write("Denúncia (Disque 100)")
-    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia (Disque 100)")    
-    st.dataframe(dados_tabela)
     st.write("Solicitação")
     dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
     st.dataframe(dados_tabela)
@@ -777,21 +775,20 @@ with tab5:
 st.write(""" ## 7 - DADOS BRUTOS""")
 st.write("Os dados abertos podem ser encontrados também no Portal de Dados Abertos do Estado de Santa Catarina.")
 #http://dados.sc.gov.br/dataset/8f14904e-91c9-482e-9b3b-862aad886b52/resource/d9f2d5d2-14da-42a2-93ba-e63a57d6f7a9/download/pda.png
-if st.checkbox('Mostrar Dados Abertos'):
+if st.checkbox('Mostrar Dados'):
     st.subheader('Manifestações de Ouvidoria')
-    st.dataframe(atendimentos)
-    atendimentos_csv = convert_df(atendimentos)
+    st.dataframe(atendimentos_periodo)
+    atendimentos_csv = convert_df(atendimentos_periodo)
     st.download_button(
-        label="Download dos dados em CSV",
+        label="Download das demandas em CSV",
         data=atendimentos_csv,
         file_name='manifestacoes_ouvidoria.csv',
         mime='text/csv'
     )
 
-
     demandas_em_tratamento = convert_df(atendimentos_encaminhados)
     st.download_button(
-        label="Download dados em CSV",
+        label="Download das demandas em tratamento em CSV",
         data=demandas_em_tratamento,
         file_name='demandas_em_tratamento.csv',
         mime='text/csv',

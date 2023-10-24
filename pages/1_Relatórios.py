@@ -33,9 +33,22 @@ def carrega_dados():
 
 atendimentos_completo = carrega_dados()
 
+@st.cache_data
+def carrega_dados_json(arquivo):
+    data = pd.read_json(arquivo)
+    return data
+orgaos_completo = carrega_dados_json('https://dados.sc.gov.br/dataset/3c9311c4-ad13-4730-bb6b-bb0f5fda2910/resource/a39660f6-5f9a-4bf3-a73d-87678ee02f12/download/tb_orgao.json')
+#st.dataframe(orgaos_completo)
+
 
 # LIMPAR ARQUIVO
 atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('Sem Tramit.','Pronto Atendimento')
+#orgaos_simples = orgaos_completo[['sg_orgao', 'nm_orgao']]
+#st.dataframe(orgaos_simples)
+#atendimentos_completo.join(orgaos_simples.set_index("", left_on=['sigla_orgao_saida'], right_on=['sg_orgao'] )
+#atendimentos_completo[atendimentos_completo.set_index(['sigla_orgao_saida']).index.isin(orgaos_simples.set_index(['sg_orgao']).index)]
+#st.dataframe(atendimentos_completo)
+#atendimentos_completo['orgao_saida'] = 
 #atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('SSP','Secretaria De Estado da Segurança Pública')
 #atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('DETRAN','Departamento Estadual de Trânsito de Santa Catarina')
 #atendimentos_completo['sigla_orgao_saida'] = atendimentos_completo['sigla_orgao_saida'].str.replace('CONIN-PM','Controladoria Interna da PM')
@@ -683,20 +696,19 @@ ate_por_orgao = atendimentos_tratados.groupby(['sigla_orgao_saida']).size().to_f
 ate_por_orgao.reset_index(inplace=True)
 ate_por_orgao.drop(ate_por_orgao[ate_por_orgao["sigla_orgao_saida"] == "Pronto Atendimento"].index, inplace=True)
 ate_por_orgao_ordenado = ate_por_orgao.sort_values(by=['quantidade'],ascending=False)
-ate_por_orgao_top = ate_por_orgao_ordenado.head(5)
+ate_por_orgao_top = ate_por_orgao_ordenado.head(10)
 ate_por_orgao_top.reset_index(drop=True, inplace=True)
 lista_orgaos = ate_por_orgao_top["sigla_orgao_saida"].values.tolist()
 #st.dataframe(lista_orgaos)         
-tab1, tab2, tab3, tab4, tab5 = st.tabs(lista_orgaos)
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs(lista_orgaos)
 
 def montar_tabela_orgao(orgao, natureza):
     reclamacoes_orgao = atendimentos_tratados.loc[(atendimentos_tratados["natureza"]==natureza) & (atendimentos_tratados["sigla_orgao_saida"]==orgao)]
     #st.dataframe(reclamacoes_orgao)
     reclamacoes_orgao_quantidade = reclamacoes_orgao.groupby(['assunto']).size().to_frame('quantidade')
     reclamacoes_orgao_quantidade_ordenado = reclamacoes_orgao_quantidade.sort_values(by=['quantidade'],ascending=False)
-    reclamacoes_top = reclamacoes_orgao_quantidade_ordenado.head(5)
+    reclamacoes_top = reclamacoes_orgao_quantidade_ordenado.head(10)
     return reclamacoes_top
-
 
 
 with tab1:
@@ -787,6 +799,97 @@ with tab5:
     st.write("Elogio")
     dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
     st.dataframe(dados_tabela)    
+
+with tab6:
+    orgao_analise = lista_orgaos[5]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)   
+
+with tab7:
+    orgao_analise = lista_orgaos[6]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)   
+
+with tab8:
+    orgao_analise = lista_orgaos[7]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)   
+
+with tab9:
+    orgao_analise = lista_orgaos[8]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)   
+
+with tab10:
+    orgao_analise = lista_orgaos[9]
+    st.write("Reclamação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Reclamação")
+    st.dataframe(dados_tabela)
+    st.write("Denúncia")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Denúncia")
+    st.dataframe(dados_tabela)
+    st.write("Solicitação")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Solicitação")
+    st.dataframe(dados_tabela)
+    st.write("Sugestão")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Sugestão")
+    st.dataframe(dados_tabela)    
+    st.write("Elogio")
+    dados_tabela = montar_tabela_orgao(orgao_analise, "Elogio")
+    st.dataframe(dados_tabela)   
+
 
 # DADOS ABERTOS
 st.write(""" ## 7 - DADOS BRUTOS""")

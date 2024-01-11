@@ -87,11 +87,11 @@ st.header("FILTROS")
 # CAMPOS DE FILTRO
 ano = st.selectbox(
     'Selecione o ano',
-    ('2019', '2020', '2021', '2022', '2023'), index=4)
+    ('2019', '2020', '2021', '2022', '2023', '2024'), index=5)
 
 relatorio = st.selectbox(
     'Selecione o relatório',
-    ('primeiro trimestre', 'segundo trimestre', 'terceiro trimestre', 'quarto trimestre', 'ano'), index=1)
+    ('primeiro trimestre', 'segundo trimestre', 'terceiro trimestre', 'quarto trimestre', 'ano'), index=0)
 
 if relatorio == 'primeiro trimestre': 
     start_date = ano + '-01-01'
@@ -138,7 +138,7 @@ atendimentos_periodo = atendimentos_completo.query('data_atendimento >= @start_d
 orgao = 'Todos'
 
 # INPUT LIGAÇÕES TELEFÔNICAS
-ligacoes = st.number_input('Quantidade de ligações no período', min_value=1, value=999, step=1)
+ligacoes = st.number_input('Quantidade de ligações no período', min_value=1, value=9999, step=1)
 
 #FILTRO OPÇÕES
 conta_transferidos = st.checkbox('Contabiliza Transferidos', value=True)
@@ -272,6 +272,7 @@ O desempenho das atividades da Ouvidoria é medido por meio de indicadores, cujo
 
 Uma das principais competências das unidades de ouvidoria é fornecer aos órgãos e entidades informações sobre as necessidades dos cidadãos para que possa melhorar continuamente seus processos, produtos e serviços. Um adequado sistema de registro das demandas facilita o levantamento dessas informações, bem como, o acesso a outros dados do órgão ou da entidade.
 """)
+st.write("3.1 TEMPO MÉDIO DE RESPOSTA DA OUVIDORIA-GERAL (EM DIAS)")
 
 st.write("Visão Geral – Período: " + str(start_date) + " a " + str(end_date))
 
@@ -351,7 +352,6 @@ subtotal.add_trace(go.Indicator(
 subtotal.update_layout(paper_bgcolor = '#424242', font_family="Roboto", font=dict(family="Roboto", size=100, color="white"))
 st.plotly_chart(subtotal)
 
-st.write("3.1 TEMPO MÉDIO DE RESPOSTA DA OUVIDORIA-GERAL (EM DIAS)")
 atendimentos_tratados_concluidos = atendimentos_tratados[(atendimentos_tratados["status"]=="Concluido")] 
 prazo_medio = atendimentos_tratados_concluidos.loc[:, 'prazo_atendimento'].mean()
 total = go.Figure(go.Indicator(
@@ -362,7 +362,10 @@ total = go.Figure(go.Indicator(
     domain = {'x': [0, 1], 'y': [0.25, 0.75]}))
 total.update_layout(paper_bgcolor = '#A1C222', font_family="Roboto", font=dict(family="Roboto", size=100, color="white"))
 st.plotly_chart(total)
+st.write("O tempo médio de resposta da Ouvidoria-Geral ao usuário foi de " + str(round(prazo_medio,2)) + " dias, incluindo as manifestações com o tratamento de pronto atendimento e as transferidas ao E-SIC.")
 
+
+st.write("3.2 TEMPO MÉDIO DE RESPOSTA DO PRONTO ATENDIMENTO (EM DIAS)")
 prazo_medio_pronto = atendimentos_pronto.loc[:, 'prazo_atendimento'].mean()
 total = go.Figure(go.Indicator(
     mode = "number",
@@ -373,6 +376,8 @@ total = go.Figure(go.Indicator(
 total.update_layout(paper_bgcolor = '#424242', font_family="Roboto", font=dict(family="Roboto", size=100, color="white"))
 st.plotly_chart(total)
 
+
+st.write("3.3 TEMPO MÉDIO DE RESPOSTA DOS ÓRGÃOS (EM DIAS)")
 prazo_medio_orgaos = atendimentos_orgaos.loc[:, 'prazo_atendimento'].mean()
 total = go.Figure(go.Indicator(
     mode = "number",
@@ -382,23 +387,22 @@ total = go.Figure(go.Indicator(
     domain = {'x': [0, 1], 'y': [0.25, 0.75]}))
 total.update_layout(paper_bgcolor = '#A1C222', font_family="Roboto", font=dict(family="Roboto", size=100, color="white"))
 st.plotly_chart(total)
-st.write("O tempo médio de resposta da Ouvidoria-Geral ao usuário foi de " + str(round(prazo_medio,2)) + " dias, incluindo as manifestações com o tratamento de pronto atendimento e as transferidas ao E-SIC.")
 st.write("Se considerarmos apenas as manifestações que foram encaminhadas aos órgãos e entidades do poder executivo estadual para tratamento, o tempo médio de resposta passa para " + str(round(prazo_medio_orgaos,2)) + " dias.")
 
 atendimentos_concluidos = atendimentos_tratados[atendimentos_tratados["status"]!="Concluidos"]
 
-ate_primeiro_por_natureza = atendimentos_tratados.groupby(['natureza']).size().to_frame('quantidade')
-quantidade_atendimentos_tratados = len(atendimentos_tratados)
+ate_primeiro_por_natureza = atendimentos_periodo.groupby(['natureza']).size().to_frame('quantidade')
+quantidade_atendimentos_tratados = len(atendimentos_periodo)
+
 quantidade_solicitacoes = int(ate_primeiro_por_natureza.query("natureza == 'Solicitação'").values[0])
 quantidade_reclamacoes = int(ate_primeiro_por_natureza.query("natureza == 'Reclamação'").values[0])
 quantidade_denuncias = int(ate_primeiro_por_natureza.query("natureza == 'Denúncia'").values[0])
-
 quantidade_elogios = int(ate_primeiro_por_natureza.query("natureza == 'Elogio'").values[0])
 quantidade_sugestoes = int(ate_primeiro_por_natureza.query("natureza == 'Sugestão'").values[0])
+
 percentual_solicitacoes = round((quantidade_solicitacoes * 100) / quantidade_atendimentos_tratados, 2) 
 percentual_reclamacoes = round((quantidade_reclamacoes * 100) / quantidade_atendimentos_tratados, 2)
 percentual_denuncias = round((quantidade_denuncias * 100) / quantidade_atendimentos_tratados, 2)
-
 percentual_elogios = round((quantidade_elogios * 100) / quantidade_atendimentos_tratados, 2) 
 percentual_sugestoes = round((quantidade_sugestoes * 100) / quantidade_atendimentos_tratados, 2) 
 
@@ -411,14 +415,12 @@ st.subheader("4.1 TIPOS DE MANIFESTAÇÕES")
 
 
 st.write("A maior parte das manifestações (" + str(percentual_solicitacoes) + "%) atendidas pela Ouvidoria pertence ao tipo Solicitação. O tipo Reclamação, alcança percentual bem menor (" + str(percentual_reclamacoes) + "%), Denúncias (" + str(percentual_denuncias) + "%), Elogios (" + str(percentual_elogios) + "%) e Sugestões (" + str(percentual_sugestoes) + "%).")
-pizza = px.pie(atendimentos_tratados, values='quantidade', names='natureza', title='Gráfico 1 - Tipologia das Manifestações', color_discrete_sequence=cores_cge)
+pizza = px.pie(atendimentos_periodo, values='quantidade', names='natureza', title='Gráfico 1 - Tipologia das Manifestações', color_discrete_sequence=cores_cge)
 pizza.update_layout(font_family="Roboto", titlefont_family="Roboto")
 st.plotly_chart(pizza)
 st.write("Fonte: Sistema OUV. " + hoje)
 
-st.write(""" 
-### 4.2 - ASSUNTOS MAIS DEMANDADOS
-""")
+st.write(""" ### 4.2 - ASSUNTOS MAIS DEMANDADOS""")
 atendimentos_solicitacoes = atendimentos_tratados[atendimentos_tratados["natureza"]=="Solicitação"]
 
 ate_primeiro_por_assunto = atendimentos_tratados.groupby(['assunto']).size().to_frame('quantidade')
@@ -447,7 +449,7 @@ if st.checkbox('Mostrar Todos os Assuntos'):
 
 st.write(""" ### 4.3 - ANÁLISE DAS MANIFESTAÇÕES – SOLICITAÇÕES""")
 
-atendimentos_solicitacoes = atendimentos_tratados[atendimentos_tratados["natureza"]=="Solicitação"]
+atendimentos_solicitacoes = atendimentos_periodo[atendimentos_periodo["natureza"]=="Solicitação"]
 
 ate_primeiro_por_assunto = atendimentos_solicitacoes.groupby(['assunto']).size().to_frame('quantidade')
 ate_primeiro_por_orgao = atendimentos_solicitacoes.groupby(['sigla_orgao_saida']).size().to_frame('quantidade')
@@ -913,4 +915,12 @@ if st.checkbox('Mostrar Dados'):
         file_name='demandas_em_tratamento.csv',
         mime='text/csv',
     )
-    
+
+    atendimentos_por_tratar = atendimentos_completo.query('transferido == "Transferido" and natureza != "Solicitação"')
+    demandas_para_ajustar = convert_df(atendimentos_por_tratar)
+    st.download_button(
+        label="Download das demandas por tratar",
+        data=demandas_para_ajustar,
+        file_name='demandas_para_ajustar.csv',
+        mime='text/csv',
+    )

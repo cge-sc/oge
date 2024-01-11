@@ -12,10 +12,6 @@ with open( "style.css" ) as css:
 hoje = str(date.today())
 ano = date.year
 
-st.set_page_config(
-    page_title="Indicadores de Ouvidoria",
-    layout="wide"
-)
 
 
 # CARREGA OS DADOS
